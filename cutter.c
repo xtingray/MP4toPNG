@@ -91,12 +91,12 @@ int main(int argc, const char *argv[])
 
     // Loop though all the streams and print its main information
     for (int i = 0; i < pFormatContext->nb_streams; i++) {
-        AVCodecParameters *pLocalCodecParameters =  NULL;
+        AVCodecParameters *pLocalCodecParameters = NULL;
         pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
-        logging("AVStream->time_base before open coded %d/%d", pFormatContext->streams[i]->time_base.num, pFormatContext->streams[i]->time_base.den);
-        logging("AVStream->r_frame_rate before open coded %d/%d", pFormatContext->streams[i]->r_frame_rate.num, pFormatContext->streams[i]->r_frame_rate.den);
-        logging("AVStream->start_time %" PRId64, pFormatContext->streams[i]->start_time);
-        logging("AVStream->duration %" PRId64, pFormatContext->streams[i]->duration);
+        logging("    AVStream->time_base before open coded %d/%d", pFormatContext->streams[i]->time_base.num, pFormatContext->streams[i]->time_base.den);
+        logging("    AVStream->r_frame_rate before open coded %d/%d", pFormatContext->streams[i]->r_frame_rate.num, pFormatContext->streams[i]->r_frame_rate.den);
+        logging("    AVStream->start_time %" PRId64, pFormatContext->streams[i]->start_time);
+        logging("    AVStream->duration %" PRId64, pFormatContext->streams[i]->duration);
 
         logging("Finding the proper decoder (CODEC)");
         logging("---");
