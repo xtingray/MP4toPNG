@@ -37,7 +37,7 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    logging("initializing all the containers, codecs and protocols.");
+    logging("*** Initializing all the containers, codecs and protocols...");
 
     // AVFormatContext holds the header information from the format (Container)
     // Allocating memory for this component
@@ -48,14 +48,14 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    logging("opening the input file (%s) and loading format (container) header", argv[1]);
+    logging("*** Opening the input file (%s) and loading format (container) header", argv[1]);
     // Open the file and read its header. The codecs are not opened.
     // The function arguments are:
     // AVFormatContext (the component we allocated memory for),
     // url (filename),
     // AVInputFormat (if you pass NULL it'll do the auto detect)
     // and AVDictionary (which are options to the demuxer)
-    // http://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga31d601155e9035d5b0e7efedc894ee49
+    // http://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html
     if (avformat_open_input(&pFormatContext, argv[1], NULL, NULL) != 0) {
         logging("ERROR could not open the file");
         return -1;
@@ -64,9 +64,9 @@ int main(int argc, const char *argv[])
     // now we have access to some information about our file
     // since we read its header we can say what format (container) it's
     // and some other information related to the format itself.
-    logging("format %s, duration %lld us, bit_rate %lld", pFormatContext->iformat->name, pFormatContext->duration, pFormatContext->bit_rate);
+    logging("*** Format: %s, Duration: %lld us, Bitrate: %lld", pFormatContext->iformat->name, pFormatContext->duration, pFormatContext->bit_rate);
 
-    logging("finding stream info from format");
+    logging("*** Finding stream info from format...");
     // read Packets from the Format to get stream information
     // this function populates pFormatContext->streams
     // (of size equals to pFormatContext->nb_streams)
@@ -74,7 +74,7 @@ int main(int argc, const char *argv[])
     // the AVFormatContext
     // and options contains options for codec corresponding to i-th stream.
     // On return each dictionary will be filled with options that were not found.
-    // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#gad42172e27cddafb81096939783b157bb
+    // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html
     if (avformat_find_stream_info(pFormatContext,  NULL) < 0) {
         logging("ERROR could not get the stream info");
         return -1;
@@ -98,12 +98,13 @@ int main(int argc, const char *argv[])
         logging("AVStream->start_time %" PRId64, pFormatContext->streams[i]->start_time);
         logging("AVStream->duration %" PRId64, pFormatContext->streams[i]->duration);
 
-        logging("finding the proper decoder (CODEC)");
+        logging("Finding the proper decoder (CODEC)");
+        logging("---");
 
         AVCodec *pLocalCodec = NULL;
 
         // Finds the registered decoder for a codec ID
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
+        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html
         pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
 
         if (pLocalCodec==NULL) {
@@ -137,35 +138,35 @@ int main(int argc, const char *argv[])
     // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html
     AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
     if (!pCodecContext) {
-        logging("failed to allocated memory for AVCodecContext");
+        logging("Failed to allocated memory for AVCodecContext");
         return -1;
     }
 
     // Fill the codec context based on the values from the supplied codec parameters
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
+    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html
     if (avcodec_parameters_to_context(pCodecContext, pCodecParameters) < 0) {
-        logging("failed to copy codec params to codec context");
+        logging("Failed to copy codec params to codec context");
         return -1;
     }
 
     // Initialize the AVCodecContext to use the given AVCodec.
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
+    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html
     if (avcodec_open2(pCodecContext, pCodec, NULL) < 0) {
-        logging("failed to open codec through avcodec_open2");
+        logging("Failed to open codec through avcodec_open2");
         return -1;
     }
 
     // https://ffmpeg.org/doxygen/trunk/structAVFrame.html
     AVFrame *pFrame = av_frame_alloc();
     if (!pFrame) {
-        logging("failed to allocate memory for AVFrame");
+        logging("Failed to allocate memory for AVFrame");
         return -1;
     }
 
     // https://ffmpeg.org/doxygen/trunk/structAVPacket.html
     AVPacket *pPacket = av_packet_alloc();
     if (!pPacket) {
-        logging("failed to allocate memory for AVPacket");
+        logging("Failed to allocate memory for AVPacket");
         return -1;
     }
 
@@ -173,7 +174,7 @@ int main(int argc, const char *argv[])
     int how_many_packets_to_process = 8;
 
     // Fill the Packet with data from the Stream
-    // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
+    // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html
     while (av_read_frame(pFormatContext, pPacket) >= 0) {
         // If it's the video stream
         if (pPacket->stream_index == video_stream_index) {
@@ -186,7 +187,7 @@ int main(int argc, const char *argv[])
             if (--how_many_packets_to_process <= 0)
                 break;
         }
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
+        // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html
         av_packet_unref(pPacket);
     }
 
@@ -215,7 +216,7 @@ static void logging(const char *fmt, ...)
 static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame)
 {
     // Supply raw packet data as input to a decoder
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
+    // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html
     int response = avcodec_send_packet(pCodecContext, pPacket);
 
     if (response < 0) {
@@ -225,7 +226,7 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 
     while (response >= 0) {
         // Return decoded output data (into a frame) from a decoder
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c
+        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html
         response = avcodec_receive_frame(pCodecContext, pFrame);
         if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
             break;
@@ -257,7 +258,6 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
             }
 
             // save a grayscale frame into a .pgm file
-            // save_gray_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename);
             int ret = save_frame_to_png(pFrame, frame_filename);
             if (ret) {
                 fprintf(stderr, "Failed to write PNG file\n");
@@ -272,6 +272,8 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 int save_frame_to_png(AVFrame *frame, const char *filename)
 {
     int ret = 0;
+
+    logging("Creating PNG file -> %s", filename);
 
     // Open the PNG file for writing
     FILE *fp = fopen(filename, "wb");
