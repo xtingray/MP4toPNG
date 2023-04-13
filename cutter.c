@@ -19,6 +19,7 @@
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
 
 // Required to create the PNG files
 #include <png.h>
@@ -217,25 +218,25 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 {
     // Supply raw packet data as input to a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html
-    int response = avcodec_send_packet(pCodecContext, pPacket);
+    int ret = avcodec_send_packet(pCodecContext, pPacket);
 
-    if (response < 0) {
-        logging("Error while sending a packet to the decoder: %s", av_err2str(response));
-        return response;
+    if (ret < 0) {
+        logging("Error while sending a packet to the decoder: %s", av_err2str(ret));
+        return ret;
     }
 
-    while (response >= 0) {
+    while (ret >= 0) {
         // Return decoded output data (into a frame) from a decoder
         // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html
-        response = avcodec_receive_frame(pCodecContext, pFrame);
-        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
+        ret = avcodec_receive_frame(pCodecContext, pFrame);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
             break;
-        } else if (response < 0) {
-            logging("Error while receiving a frame from the decoder: %s", av_err2str(response));
-            return response;
+        } else if (ret < 0) {
+            logging("Error while receiving a frame from the decoder: %s", av_err2str(ret));
+            return ret;
         }
 
-        if (response >= 0) {
+        if (ret >= 0) {
             logging(
                 "Frame %d (type=%c, size=%d bytes, format=%d) pts %d key_frame %d [DTS %d]",
                 pCodecContext->frame_number,
@@ -257,11 +258,41 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
                 logging("Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB");
             }
 
-            // save a grayscale frame into a .pgm file
-            int ret = save_frame_to_png(pFrame, frame_filename);
-            if (ret) {
-                fprintf(stderr, "Failed to write PNG file\n");
+            // To create the PNG files, the AVFrame data must be translated from YUV420P format into RGB24
+            struct SwsContext *sws_ctx = sws_getContext(
+                pFrame->width, pFrame->height, pFrame->format,
+                pFrame->width, pFrame->height, AV_PIX_FMT_RGB24,
+                SWS_BILINEAR, NULL, NULL, NULL);
+
+            // Allocate a new AVFrame for the output RGB24 image
+            AVFrame* rgb_frame = av_frame_alloc();
+
+            // Set the properties of the output AVFrame
+            rgb_frame->format = AV_PIX_FMT_RGB24;
+            rgb_frame->width = pFrame->width;
+            rgb_frame->height = pFrame->height;
+
+            int ret = av_frame_get_buffer(rgb_frame, 0);
+            if (ret < 0) {
+                logging("Error while preparing RGB frame: %s", av_err2str(ret));
+                return ret;
             }
+
+            logging("Transforming frame format from YUV420P into RGB24...");
+            ret = sws_scale(sws_ctx, pFrame->data, pFrame->linesize, 0, pFrame->height, rgb_frame->data, rgb_frame->linesize);
+            if (ret < 0) {
+                logging("Error while translating the frame format from YUV420P into RGB24: %s", av_err2str(ret));
+                return ret;
+            }
+
+            // save a frame into a .PNG file
+            ret = save_frame_to_png(rgb_frame, frame_filename);
+            if (ret < 0) {
+                fprintf(stderr, "Failed to write PNG file\n");
+                return -1;
+            }
+
+            av_frame_free(&rgb_frame);
         }
     }
 
@@ -279,7 +310,7 @@ int save_frame_to_png(AVFrame *frame, const char *filename)
     FILE *fp = fopen(filename, "wb");
     if (!fp) {
         fprintf(stderr, "Failed to open file '%s'\n", filename);
-        return 1;
+        return -1;
     }
 
     // Create the PNG write struct and info struct
@@ -287,7 +318,7 @@ int save_frame_to_png(AVFrame *frame, const char *filename)
     if (!png_ptr) {
         fprintf(stderr, "Failed to create PNG write struct\n");
         fclose(fp);
-        return 1;
+        return -1;
     }
 
     png_infop info_ptr = png_create_info_struct(png_ptr);
@@ -295,7 +326,7 @@ int save_frame_to_png(AVFrame *frame, const char *filename)
         fprintf(stderr, "Failed to create PNG info struct\n");
         png_destroy_write_struct(&png_ptr, NULL);
         fclose(fp);
-        return 1;
+        return -1;
     }
 
     // Set up error handling for libpng
@@ -303,7 +334,7 @@ int save_frame_to_png(AVFrame *frame, const char *filename)
         fprintf(stderr, "Error writing PNG file\n");
         png_destroy_write_struct(&png_ptr, &info_ptr);
         fclose(fp);
-        return 1;
+        return -1;
     }
 
     // Set the PNG file as the output for libpng
