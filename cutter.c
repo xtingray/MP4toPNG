@@ -31,6 +31,9 @@ static int decode_packet(AVPacket *pPacket, AVCodecContext *pCodecContext, AVFra
 // Save a frame into a .png file
 static int save_frame_to_png(AVFrame *frame, const char *filename);
 
+// Number of images to create
+#define IMAGES_TOTAL 10
+
 int main(int argc, const char *argv[])
 {
     if (argc < 2) {
@@ -171,8 +174,8 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    int response = 0;
-    int how_many_packets_to_process = 8;
+    int ret = 0;
+    int counter = 0;
 
     // Fill the Packet with data from the Stream
     // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html
@@ -181,12 +184,13 @@ int main(int argc, const char *argv[])
         if (pPacket->stream_index == video_stream_index) {
             logging("---");
             logging("AVPacket->pts %" PRId64, pPacket->pts);
-            response = decode_packet(pPacket, pCodecContext, pFrame);
-            if (response < 0)
+            ret = decode_packet(pPacket, pCodecContext, pFrame);
+            if (ret < 0)
                 break;
             // Stop it, otherwise we'll be saving hundreds of frames
-            if (--how_many_packets_to_process <= 0)
+            if (counter > IMAGES_TOTAL)
                 break;
+            counter++;
         }
         // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html
         av_packet_unref(pPacket);
